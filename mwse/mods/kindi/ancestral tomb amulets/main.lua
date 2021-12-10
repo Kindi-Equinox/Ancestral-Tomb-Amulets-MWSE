@@ -193,17 +193,19 @@ end
 
 local function closeAtaTableRC()
     local todd = tes3ui.findMenu(ata_kindi_menuId)
+	if todd then
     data.menuPosx = todd.positionX
     data.menuPosy = todd.positiony
     data.menuWidth = todd.width
     data.menuHeight = todd.height
+	end
     if todd then
         core.alternate = false
         todd:destroy()
     end
 end
 
---[[local function getall()
+local function getall()
     for a in tes3.getPlayerCell():iterateReferences(tes3.objectType.container) do
         for k, v in pairs(a.object.inventory) do
             if v.object.id:match("ata_kindi_amulet") then
@@ -215,7 +217,7 @@ end
     tes3ui.updateInventoryTiles()
     amuletCreationCellRecycle(tes3.getPlayerCell())
 end
-event.register("keyDown", getall, {filter = tes3.scanCode.g})]]
+event.register("keyDown", getall, {filter = tes3.scanCode.g})
 
 event.register("equipped", amuletEquipped)
 event.register("loaded", loadDataAndCheckMod)
