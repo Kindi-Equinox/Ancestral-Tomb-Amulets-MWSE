@@ -573,6 +573,10 @@ core.listTheTomb = function(tombList)
 end
 
 core.showTombList = function(openedFromMCM)
+    if tes3.findGlobal("ChargenState").value ~= -1 then
+		tes3.messageBox("Table can only be opened after chargen is completed")
+        return
+    end
     tes3ui.getMenuOnTop():destroy()
     data.ownedAmulets = {}
     core.alternate = openedFromMCM or tes3.worldController.inputController:isKeyDown(config.hotkeyOpenModifier.keyCode)
@@ -653,7 +657,7 @@ core.showTombList = function(openedFromMCM)
     buttonBlock.autoWidth = true
     buttonBlock.autoHeight = true
 
-    --[[local closeButton = buttonBlock:createButton {id = ata_kindi_buttonClose}
+    local closeButton = buttonBlock:createButton {id = ata_kindi_buttonClose}
     closeButton.text = "Close"
     closeButton:register(
         "mouseClick",
@@ -666,7 +670,8 @@ core.showTombList = function(openedFromMCM)
                 menu:destroy()
             end
         end
-    )]]
+    )
+
     local storeAllButton = buttonBlock:createButton {}
     storeAllButton.text = "Store All"
     storeAllButton:register(
