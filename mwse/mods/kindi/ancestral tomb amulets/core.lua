@@ -606,7 +606,7 @@ core.showTombList = function(openedFromMCM)
 
     local menu = tes3ui.createMenu({id = ata_kindi_menuId, dragFrame = true, fixedFrame = false})
     menu.text = "Table of Ancestral Tomb Amulets"
-    menu.width = data.menuWidth or 450
+    menu.width = data.menuWidth or 400
     menu.height = data.menuHeight or 700
     menu.minWidth = 100
     menu.minHeight = 300
