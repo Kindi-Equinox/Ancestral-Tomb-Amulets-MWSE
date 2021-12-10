@@ -137,7 +137,7 @@ local function amuletCreationCellRecycle(e)
         end
     end
 
-	--we only want to place amulets inside interiors
+    --we only want to place amulets inside interiors
     if not thisCell.isInterior then
         return
     end
@@ -183,12 +183,20 @@ local function openList(k)
     end
 
     if config.hotkey and k.keyCode == config.hotkeyOpenTable.keyCode then
+        if tes3.findGlobal("ChargenState").value ~= -1 then
+            tes3.messageBox("Table can only be opened after chargen is completed")
+            return
+        end
         core.showTombList()
     end
 end
 
 local function closeAtaTableRC()
     local todd = tes3ui.findMenu(ata_kindi_menuId)
+    data.menuPosx = todd.positionX
+    data.menuPosy = todd.positiony
+    data.menuWidth = todd.width
+    data.menuHeight = todd.height
     if todd then
         core.alternate = false
         todd:destroy()

@@ -14,6 +14,10 @@ ata_kindi_buttonBlock = tes3ui.registerID("atakindibuttonblock")
 ata_kindi_buttonClose = tes3ui.registerID("atakindibuttonclose")
 ata_kindi_input = tes3ui.registerID("atakindiinput")
 
+data.menuWidth = nil
+data.menuHeight = nil
+data.menuPosx = nil
+data.menuPosy = nil
 data.ownedAmulets = {}
 data.storageCrate = nil
 data.superCrate = nil
@@ -61,7 +65,7 @@ data.amuletIcon = {
     "c\\tx_amulet_expens3.tga",
     "c\\tx_amulet_exquisite1.tga",
     "c\\tx_amulet_extrav1.tga",
-    "c\\tx_amulet_extrav2.tga",
+    "c\\tx_amulet_extrav2.tga"
 }
 
 data.otherLabel =
@@ -82,78 +86,78 @@ data.tombExtra = {
 --[[key must be a valid tomb cell ID, value will be the tooltip description]]
 --[[require tooltips complete mod ]]
 data.customAmuletTooltip = {
-["Drethan Ancestral Tomb"] = "Extravagant jewellery of the Drethan family",
-["Marvani Ancestral Tomb"] = "Unique ornament of the Marvani family",
-["Andrano Ancestral Tomb"] = "Magnificent gemstone of the Andrano family",
+    ["Drethan Ancestral Tomb"] = "Extravagant jewellery of the Drethan family",
+    ["Marvani Ancestral Tomb"] = "Unique ornament of the Marvani family",
+    ["Andrano Ancestral Tomb"] = "Magnificent gemstone of the Andrano family"
 }
 data.effects = {
-WaterBreathing = 0,
-SwiftSwim = 1,
-WaterWalking = 2,
-Shield = 3,
-FireShield = 4,
-LightningShield = 5,
-FrostShield = 6,
-Feather = 8,
-SlowFall = 11,
-Invisibility = 39,
-Chameleon = 40,
-Light = 41,
-Sanctuary = 42,
-NightEye = 43,
-DetectAnimal = 64,
-DetectEnchantment = 65,
-DetectKey = 66,
-SpellAbsorption = 67,
-Reflect = 68,
-CureCommonDisease = 69,
-CureBlightDisease = 70,
-CurePoison = 72,
-CureParalyzation = 73,
-FortifyHealth = 80,
-FortifyMagicka = 81,
-FortifyFatigue = 82,
-ResistFire = 90,
-ResistFrost = 91,
-ResistShock = 92,
-ResistMagicka = 93,
-ResistCommonDisease = 94,
-ResistBlightDisease = 95,
-ResistPoison = 97,
-ResistNormalWeapons = 98,
-ResistParalysis = 99,
-SummonScamp = 102,
-SummonClannfear = 103,
-SummonDaedroth = 104,
-SummonDremora = 105,
-SummonGhost = 106,
-SummonSkeleton = 107,
-SummonLeastBonewalker = 108,
-SummonGreaterBonewalker = 109,
-SummonBonelord = 110,
-SummonTwilight = 111,
-SummonHunger = 112,
-SummonGoldenSaint = 113,
-SummonFlameAtronach = 114,
-SummonFrostAtronach = 115,
-SummonStormAtronach = 116,
-FortifyAttackBonus = 117,
-BoundDagger = 120,
-BoundLongsword = 121,
-BoundMace = 122,
-BoundBattleAxe = 123,
-BoundSpear = 124,
-BoundLongbow = 125,
-BoundCuirass = 127,
-BoundHelm = 128,
-BoundBoots = 129,
-BoundShield = 130,
-BoundGloves = 131
+    WaterBreathing = 0,
+    SwiftSwim = 1,
+    WaterWalking = 2,
+    Shield = 3,
+    FireShield = 4,
+    LightningShield = 5,
+    FrostShield = 6,
+    Feather = 8,
+    SlowFall = 11,
+    Invisibility = 39,
+    Chameleon = 40,
+    Light = 41,
+    Sanctuary = 42,
+    NightEye = 43,
+    DetectAnimal = 64,
+    DetectEnchantment = 65,
+    DetectKey = 66,
+    SpellAbsorption = 67,
+    Reflect = 68,
+    CureCommonDisease = 69,
+    CureBlightDisease = 70,
+    CurePoison = 72,
+    CureParalyzation = 73,
+    FortifyHealth = 80,
+    FortifyMagicka = 81,
+    FortifyFatigue = 82,
+    ResistFire = 90,
+    ResistFrost = 91,
+    ResistShock = 92,
+    ResistMagicka = 93,
+    ResistCommonDisease = 94,
+    ResistBlightDisease = 95,
+    ResistPoison = 97,
+    ResistNormalWeapons = 98,
+    ResistParalysis = 99,
+    SummonScamp = 102,
+    SummonClannfear = 103,
+    SummonDaedroth = 104,
+    SummonDremora = 105,
+    SummonGhost = 106,
+    SummonSkeleton = 107,
+    SummonLeastBonewalker = 108,
+    SummonGreaterBonewalker = 109,
+    SummonBonelord = 110,
+    SummonTwilight = 111,
+    SummonHunger = 112,
+    SummonGoldenSaint = 113,
+    SummonFlameAtronach = 114,
+    SummonFrostAtronach = 115,
+    SummonStormAtronach = 116,
+    FortifyAttackBonus = 117,
+    BoundDagger = 120,
+    BoundLongsword = 121,
+    BoundMace = 122,
+    BoundBattleAxe = 123,
+    BoundSpear = 124,
+    BoundLongbow = 125,
+    BoundCuirass = 127,
+    BoundHelm = 128,
+    BoundBoots = 129,
+    BoundShield = 130,
+    BoundGloves = 131
 }
 
-
-data.links = {modpage = "https://www.nexusmods.com/morrowind/mods/49779", video = "https://www.youtube.com/watch?v=wyQsfgY76Ug"}
+data.links = {
+    modpage = "https://www.nexusmods.com/morrowind/mods/49779",
+    video = "https://www.youtube.com/watch?v=wyQsfgY76Ug"
+}
 
 return data
-
-
