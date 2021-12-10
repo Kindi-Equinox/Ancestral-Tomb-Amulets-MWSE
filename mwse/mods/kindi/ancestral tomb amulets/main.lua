@@ -203,7 +203,7 @@ local function closeAtaTableRC()
     end
 end
 
-local function getall()
+--[[local function getall()
     for a in tes3.getPlayerCell():iterateReferences(tes3.objectType.container) do
         for k, v in pairs(a.object.inventory) do
             if v.object.id:match("ata_kindi_amulet") then
@@ -215,7 +215,7 @@ local function getall()
     tes3ui.updateInventoryTiles()
     amuletCreationCellRecycle(tes3.getPlayerCell())
 end
-event.register("keyDown", getall, {filter = tes3.scanCode.g})
+event.register("keyDown", getall, {filter = tes3.scanCode.g})]]
 
 event.register("equipped", amuletEquipped)
 event.register("loaded", loadDataAndCheckMod)
