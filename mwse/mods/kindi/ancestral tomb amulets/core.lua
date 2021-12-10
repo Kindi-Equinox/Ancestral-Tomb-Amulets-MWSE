@@ -568,7 +568,7 @@ core.listTheTomb = function(tombList)
         end
     end
 
-	menus:updateLayout()
+    menus:updateLayout()
     scroll.widget:contentsChanged()
 end
 

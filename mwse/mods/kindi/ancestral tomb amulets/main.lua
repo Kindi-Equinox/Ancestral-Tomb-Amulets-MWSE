@@ -125,11 +125,6 @@ local function amuletCreationCellRecycle(e)
         return
     end
 
-    --we only want to place amulets inside interiors
-    if not thisCell.isInterior then
-        return
-    end
-
     --here we recycle any amulet in the cell if the option is enabled
     if config.removeRecycle and data.plusChance == 0 and e.previousCell then
         for cont in e.previousCell:iterateReferences(tes3.objectType.container) do
@@ -140,6 +135,11 @@ local function amuletCreationCellRecycle(e)
                 end
             end
         end
+    end
+
+	--we only want to place amulets inside interiors
+    if not thisCell.isInterior then
+        return
     end
 
     --if this is a tomb, and its amulet has not been placed anywhere yet, and if tomb raider option is enabled, then we remove this tomb from the cell limit (if enabled)
