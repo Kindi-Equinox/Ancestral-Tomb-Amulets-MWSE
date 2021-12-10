@@ -568,6 +568,7 @@ core.listTheTomb = function(tombList)
         end
     end
 
+	menus:updateLayout()
     scroll.widget:contentsChanged()
 end
 
@@ -635,8 +636,6 @@ core.showTombList = function(openedFromMCM)
     local divider = menu:createDivider {}
 
     local list = menu:createVerticalScrollPane({id = ata_kindi_listId})
-    list.wrapText = true
-    list.justifyText = "center"
 
     local tombList = list:createBlock({id = ata_kindi_tombList})
     tombList.autoWidth = true
