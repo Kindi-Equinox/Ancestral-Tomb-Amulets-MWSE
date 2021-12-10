@@ -380,6 +380,7 @@ core.listTheTomb = function(tombList)
 
     for sourceMod, listOfTombID in pairs(data.source) do
         local pluginLabel = tombList:createLabel {id = ata_kindi_pluginId}
+        pluginLabel.widthProportional = 0.1
         pluginLabel.wrapText = true
         pluginLabel.justifyText = "center"
         pluginLabel.font = 2
@@ -507,6 +508,7 @@ core.listTheTomb = function(tombList)
                                     playSound = true
                                 }
                                 data.ownedAmulets[tombID] = insideDummy[tombID]
+                                tes3.playSound {soundPath = ("vo\\misc\\hit heart %s.mp3"):format(math.random(4))}
                             end
                             core.listTheTomb(tombList)
                         end
@@ -533,7 +535,6 @@ core.listTheTomb = function(tombList)
                     "mouseClick",
                     function()
                         tes3.messageBox("This amulet is placed somewhere..")
-                        tes3.playSound {soundPath = ("vo\\misc\\hit heart %s.mp3"):format(math.random(4))}
                         --tes3.playSound {soundPath = ("vo\\misc\\hit heart %s.mp3"):format(math.random(5, 6))}
                     end
                 )
@@ -555,13 +556,15 @@ core.listTheTomb = function(tombList)
     end
 
     if core.alternate and key == "" then
-        rejectedTombsLabel = tombList:createLabel {}
+        local rejectedTombsLabel = tombList:createLabel {}
+        rejectedTombsLabel.widthProportional = 0.1
         rejectedTombsLabel.text =
             ("\n%s Tomb Doors Rejected\n"):format(table.size(tes3.player.data.ata_kindi_data.rejectedTombs))
         rejectedTombsLabel.wrapText = true
         rejectedTombsLabel.justifyText = "center"
         for tombID, door in pairs(tes3.player.data.ata_kindi_data.rejectedTombs) do
             local rejectedTombs = tombList:createLabel {}
+            rejectedTombs.widthProportional = 0.1
             rejectedTombs.text = tombID .. " from " .. door.cell.id .. "\n"
             rejectedTombs.wrapText = true
             rejectedTombs.justifyText = "center"
@@ -573,10 +576,6 @@ core.listTheTomb = function(tombList)
 end
 
 core.showTombList = function(openedFromMCM)
-    if tes3.findGlobal("ChargenState").value ~= -1 then
-		tes3.messageBox("Table can only be opened after chargen is completed")
-        return
-    end
     tes3ui.getMenuOnTop():destroy()
     data.ownedAmulets = {}
     core.alternate = openedFromMCM or tes3.worldController.inputController:isKeyDown(config.hotkeyOpenModifier.keyCode)
@@ -607,13 +606,13 @@ core.showTombList = function(openedFromMCM)
 
     local menu = tes3ui.createMenu({id = ata_kindi_menuId, dragFrame = true, fixedFrame = false})
     menu.text = "Table of Ancestral Tomb Amulets"
-    menu.width = 400
-    menu.height = 700
-    menu.minWidth = 400
-    menu.minHeight = 700
-    menu.maxWidth = 400
-    menu.positionX = menu.width / -2
-    menu.positionY = menu.height / 2
+    menu.width = data.menuWidth or 450
+    menu.height = data.menuHeight or 700
+    menu.minWidth = 100
+    menu.minHeight = 300
+    menu.maxWidth = 450
+    menu.positionX = data.menuPosx or menu.width / -2
+    menu.positionY = data.menuPosy or menu.height / 2
     menu.alpha = tes3.worldController.menuAlpha
     menu.wrapText = true
     menu.justifyText = "center"
@@ -626,6 +625,7 @@ core.showTombList = function(openedFromMCM)
     blockBar.borderAllSides = 1
 
     local counter = blockBar:createLabel {id = ata_kindi_counterId}
+    counter.widthProportional = 0.1
     counter.text = ("Amulets in your possession:\n\n")
     counter.wrapText = true
     counter.justifyText = "center"
