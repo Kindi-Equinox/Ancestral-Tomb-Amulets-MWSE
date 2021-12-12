@@ -779,7 +779,11 @@ core.amuletInfoCheat = function(dataT)
     end
 
     if refs then
-        return ("Located in: %s\nInside: %s\n"):format(refs.cell, refs.object.name)
+        return ("Located in: %s\nInside: %s %s\n"):format(
+            refs.cell,
+            refs.object.name,
+            refs.disabled and "(Disabled)" or ""
+        )
     else
         return ("This amulet is lost forever")
     end

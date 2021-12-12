@@ -173,6 +173,19 @@ smartPlace:createYesNoButton {
     end
 }
 
+smartPlace:createYesNoButton {
+    label = "Tomb guardian",
+    variable = EasyMCM.createTableVariable {id = "tombguardian", table = config},
+    description = "All undead inside the tomb will be friendly towards the amulet wearer\nIf the undead is already in combat, in will be pacified\nUnequipping amulet will cause the undead to become hostile again.",
+    callback = function()
+        if config.tombRaider then
+            tes3.messageBox("Tomb guardian")
+        else
+            tes3.messageBox("No tomb guardian")
+        end
+    end
+}
+
 local scripted = page:createCategory("Scripted Containers")
 scripted:createYesNoButton {
     label = "Scripted Containers",
