@@ -181,7 +181,7 @@ local function pacifyUndead(e)
         enchanted = true,
         objectType = tes3.objectType.clothing,
         slot = tes3.clothingSlot.amulet
-    } or
+        } or
         --if not then we try to check if target is equipping amulet..
         tes3.getEquippedItem {
             actor = target,
@@ -206,7 +206,6 @@ local function pacifyUndead(e)
      then
         --if the attacker is an undead then we make it friendly to amulet equipor..
         if attacker.reference.object.type == tes3.creatureType.undead then
-            --if attacker is not undead, then we make all undead attack this attacker
             timer.delayOneFrame(
                 function()
                     --it is safer to remove similar effects first before applying new one
@@ -236,6 +235,7 @@ local function pacifyUndead(e)
                 end
             )
         else
+            --if attacker is not undead, then we make all undead attack this attacker
             timer.delayOneFrame(
                 function()
                     for undead in target.cell:iterateReferences() do
