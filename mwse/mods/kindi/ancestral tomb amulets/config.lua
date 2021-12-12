@@ -4,6 +4,7 @@
 	maxCycle = 75,
 	useBestCont = false,
 	tombRaider = false,
+	tombguardian = false,
 	showSpawn = false,
 	showReset = false,
 	affectScripted = false,

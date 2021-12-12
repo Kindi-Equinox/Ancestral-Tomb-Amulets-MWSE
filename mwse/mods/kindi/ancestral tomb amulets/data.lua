@@ -26,6 +26,7 @@ data.allTombs = {} --default + custom tombs
 data.source = {} --k = sourcemod, v = cellid
 data.plusChance = 0
 data.unusedDoors = {} --[[doors inside tomb without a destination, maybe useful in the future]]
+
 data.tooltipsComplete = nil
 data.tooltipsCompleteIsInstalled =
     io.open(tes3.installDirectory .. "\\data files\\mwse\\mods\\Tooltips Complete\\interop.lua", "r")

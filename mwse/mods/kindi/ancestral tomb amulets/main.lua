@@ -16,15 +16,11 @@ local function amuletEquipped(this)
         cell = itemdata.data.tomb
     end
 
-    if not cell then
-        this.itemData.data.tomb = tes3.getObject(this.item.id).itemData.data.tomb
-    end
-
     if equipor == tes3.player.mobile then
         --equip normally
     elseif cell and equipor ~= tes3.player.mobile then
         --if not player then we make the wearer teleport to the tomb
-        equipor:unequip {item = item}
+        --equipor:unequip {item = item}
         core.teleport(cell, equipor)
         equipor = nil
     end
@@ -169,6 +165,90 @@ local function amuletCreationCellRecycle(e)
     core.amuletCreation(thisCell)
 end
 
+--makes undead inside tomb friendly to ring wearer
+local function pacifyUndead(e)
+    if not config.tombguardian then
+        return
+    end
+
+    local attacker = e.actor or e.mobile
+    local target = e.target or e.targetMobile
+
+    --we check if player is equipping a amulet first..
+    local equippedAmulet =
+        tes3.getEquippedItem {
+        actor = tes3.player,
+        enchanted = true,
+        objectType = tes3.objectType.clothing,
+        slot = tes3.clothingSlot.amulet
+    } or
+        --if not then we try to check if target is equipping amulet..
+        tes3.getEquippedItem {
+            actor = target,
+            enchanted = true,
+            objectType = tes3.objectType.clothing,
+            slot = tes3.clothingSlot.amulet
+        }
+
+    --includes followers
+    local targetHasAmuletConnection = function(amulet)
+        for _, friend in pairs(target.friendlyActors) do
+            if mwscript.hasItemEquipped {reference = friend, item = amulet} then
+                return true
+            end
+        end
+    end
+
+    --if amulet is equipped and it matches the tomb..
+    if
+        equippedAmulet and equippedAmulet.itemData.data.tomb == target.cell.id and
+            targetHasAmuletConnection(equippedAmulet.object)
+     then
+        --if the attacker is an undead then we make it friendly to amulet equipor..
+        if attacker.reference.object.type == tes3.creatureType.undead then
+            --if attacker is not undead, then we make all undead attack this attacker
+            timer.delayOneFrame(
+                function()
+                    --it is safer to remove similar effects first before applying new one
+                    tes3.removeEffects {reference = attacker, effect = tes3.effect.calmCreature}
+                    tes3.applyMagicSource {
+                        reference = attacker,
+                        name = "(^_^)",
+                        bypassResistances = true,
+                        effects = {
+                            {
+                                id = tes3.effect.calmCreature,
+                                range = tes3.effectRange.self,
+                                radius = tes3.getObject("Calm Creature").effects[1].radius,
+                                duration = tes3.getObject("Calm Creature").effects[1].duration,
+                                min = 999,
+                                max = 999
+                            }
+                        }
+                    }
+                    attacker:stopCombat() --sometimes unreliable!
+                    mwscript.stopCombat {reference = attacker}
+                    tes3.applyMagicSource {
+                        reference = attacker,
+                        source = tes3.getObject("Calm Creature"),
+                        bypassResistances = true
+                    }
+                end
+            )
+        else
+            timer.delayOneFrame(
+                function()
+                    for undead in target.cell:iterateReferences() do
+                        if undead.mobile and undead.object.type == tes3.creatureType.undead then
+                            undead.mobile:startCombat(attacker)
+                        end
+                    end
+                end
+            )
+        end
+    end
+end
+
 event.register(
     "modConfigReady",
     function()
@@ -184,7 +264,7 @@ local function openList(k)
 
     if config.hotkey and k.keyCode == config.hotkeyOpenTable.keyCode then
         if tes3.findGlobal("ChargenState").value ~= -1 then
-            tes3.messageBox("Table can only be opened after chargen is completed")
+            tes3.messageBox("Table can only be opened after character generation is completed")
             return
         end
         core.showTombList()
@@ -193,19 +273,21 @@ end
 
 local function closeAtaTableRC()
     local todd = tes3ui.findMenu(ata_kindi_menuId)
-	if todd then
-    data.menuPosx = todd.positionX
-    data.menuPosy = todd.positiony
-    data.menuWidth = todd.width
-    data.menuHeight = todd.height
-	end
     if todd then
+        data.menuPosx = todd.positionX
+        data.menuPosy = todd.positiony
+        data.menuWidth = todd.width
+        data.menuHeight = todd.height
         core.alternate = false
         todd:destroy()
     end
 end
 
 --[[local function getall()
+    if tes3.getPlayerTarget() and tes3.getPlayerTarget().object.objectType == tes3.objectType.npc then
+    tes3.transferItem {from = tes3.player, to = tes3.getPlayerTarget() or tes3.player, item = "ata_kindi_amulet_38"}
+    tes3.getPlayerTarget().mobile:equip {item = "ata_kindi_amulet_38"}
+    end
     for a in tes3.getPlayerCell():iterateReferences(tes3.objectType.container) do
         for k, v in pairs(a.object.inventory) do
             if v.object.id:match("ata_kindi_amulet") then
@@ -213,14 +295,14 @@ end
             end
         end
     end
-    tes3ui.forcePlayerInventoryUpdate()
-    tes3ui.updateInventoryTiles()
     amuletCreationCellRecycle(tes3.getPlayerCell())
 end
 event.register("keyDown", getall, {filter = tes3.scanCode.g})]]
-
 event.register("equipped", amuletEquipped)
 event.register("loaded", loadDataAndCheckMod)
 event.register("cellChanged", amuletCreationCellRecycle)
 event.register("keyDown", openList)
 event.register("menuExit", closeAtaTableRC)
+event.register("combatStart", pacifyUndead)
+event.register("attack", pacifyUndead)
+--event.register("menuEnter", function() tes3ui.forcePlayerInventoryUpdate() tes3ui.updateInventoryTiles() end)
