@@ -3,7 +3,8 @@ local config = require("kindi.ancestral tomb amulets.config")
 local core = {}
 
 core.alternate = false
-
+core.ownedAmulets = {}
+core.tipsMessage = nil
 ------------------------------------------------------------
 -------------------AMULET SETUP-----------------------------
 ------------------------------------------------------------
@@ -24,7 +25,7 @@ core.getUnusedAmulet = function(n)
     local amuletid = "ata_kindi_amulet_" .. n
     local amulet = tes3.getObject(amuletid)
 
-    if amulet and not amulet.modified then
+    if not table.find(tes3.player.data.ata_kindi_data.modifiedAmulets, amuletid) then
         return amulet
     end
 end
@@ -89,6 +90,7 @@ end
 core.initialize = function()
     setmetatable(tes3.player.data.ata_kindi_data.defaultTombs, data.meta)
     setmetatable(tes3.player.data.ata_kindi_data.customTombs, data.meta)
+    setmetatable(tes3.player.data.ata_kindi_data.traversedCells, data.meta2)
 
     for _, cell in pairs(tes3.dataHandler.nonDynamicData.cells) do
         for door in cell:iterateReferences(tes3.objectType.door) do
@@ -99,7 +101,7 @@ core.initialize = function()
                 if not string.match(door.destination.cell.id, ", ") and not door.cell.isInterior then
                     tes3.player.data.ata_kindi_data.defaultTombs[door.destination.cell.id] = door
                 elseif not data.tombExtra[door.destination.cell.id] then
-                    tes3.player.data.ata_kindi_data.rejectedTombs[door.destination.cell.id] = door
+                    data.rejectedTombs[door.destination.cell.id] = door
                 end
             end
         end
@@ -129,11 +131,14 @@ end
 core.tombList = function()
     for tombID, door in pairs(data.allTombs) do
         if tes3.getCell {id = tombID} then
-            if door.sourceMod then
-                data.source[door.sourceMod] = {}
+            if door.cell and door.cell.sourceMod then
+                data.source[door.cell.sourceMod] = {}
+            elseif data.tombExtra[tombID] and tes3.getCell {id = tombID}.sourceMod then
+                data.source[tes3.getCell {id = tombID}.sourceMod] = {}
             elseif tes3.getCell {id = tombID}.sourceMod then
-                data.source[tes3.getCell {id = tombID}.sourceMod] = {} --fallback hack because sourcemod sometimes doesnt work because todd
-            else
+				data.source[tes3.getCell {id = tombID}.sourceMod] = {}
+			else
+                --data.source['Unknown_origin'] = {}
             end
         else
             --remove any tombs that is not in the game from the table
@@ -141,27 +146,19 @@ core.tombList = function()
         end
     end
 
-    --put each tomb into categories based on sourcemod
-    for sourcemod, category in pairs(data.source) do
+    for source, category in pairs(data.source) do
         for tombID, door in pairs(data.allTombs) do
-            if door.destination and door.destination.cell.sourceMod == sourcemod then
+            if tes3.getCell {id = tombID}.sourceMod == source then
                 table.insert(category, tombID)
-            elseif tes3.getCell {id = tombID} and tes3.getCell {id = tombID}.sourceMod == sourcemod then
+            elseif door.sourceMod == source then
                 table.insert(category, tombID)
-            elseif not tes3.getCell {id = tombID}.sourceMod then --another fallback hack because sourcemod sometimes returns nil?? because todd
+            elseif door.cell and door.cell.sourceMod == source then
                 table.insert(category, tombID)
-            else
-                data.unusedDoors[tombID] = door --see data.lua
+            elseif (door.cell and not door.cell.sourceMod) or not tes3.getCell {id = tombID}.sourceMod then
+                data.unusedDoors[tombID] = door
             end
         end
     end
-
-    --[[for tombID in pairs(data.tombExtra) do
-        local cell = tes3.getCell {id = tombID}
-        if cell and cell.sourceMod then
-            table.insert(data.source[cell.sourcemod], tombID)
-        end
-    end]]
     for _, tombIDs in pairs(data.source) do
         table.sort(
             tombIDs,
@@ -175,6 +172,14 @@ end
 ------------------------------------------------------------
 -------------------AMULET AND CONTAINER---------------------
 ------------------------------------------------------------
+
+core.autoEquipAmulet = function(mobActor, amulet)
+    if mobActor.reference.object.inventory:contains(amulet) then
+        if config.autoequipamuletattacked then
+            return mobActor:equip {item = amulet, addItem = false}
+        end
+    end
+end
 
 core.teleport = function(cell, equipor)
     local cell = tes3.getCell {id = cell}
@@ -228,20 +233,22 @@ core.teleport = function(cell, equipor)
                         if not tes3.getObject("atakinditelevfx") then
                             return
                         end
-                        local r =
+                        local teleportEffect =
                             tes3.createReference {
                             object = "atakinditelevfx",
                             position = equipor.position,
                             orientation = orientation,
                             cell = cell
                         }
-                        r.hasNoCollision = true
+                        teleportEffect.hasNoCollision = true
                         timer.start {
                             type = timer.real,
                             duration = 0.1,
                             iterations = 19,
                             callback = function()
-                                r.position = equipor.position
+                                if teleportEffect then
+                                    teleportEffect.position = equipor.position
+                                end
                             end
                         }
                     end
@@ -379,7 +386,15 @@ core.listTheTomb = function(tombList)
     tombList:destroyChildren()
 
     for sourceMod, listOfTombID in pairs(data.source) do
-        local pluginLabel = tombList:createLabel {id = ata_kindi_pluginId}
+        local sourcemodBlock = tombList:createBlock {id = tes3ui.registerID("ata_kindi_sourcemod_" .. sourceMod)}
+        sourcemodBlock.autoWidth = true
+        sourcemodBlock.autoHeight = true
+        sourcemodBlock.flowDirection = "top_to_bottom"
+        sourcemodBlock.widthProportional = 1.0
+        sourcemodBlock.borderAllSides = 3
+        sourcemodBlock.wrapText = true
+        local pluginLabel =
+            sourcemodBlock:createLabel {id = tes3ui.registerID("ata_kindi_sourcemod_label_" .. sourceMod)}
         pluginLabel.widthProportional = 0.1
         pluginLabel.wrapText = true
         pluginLabel.justifyText = "center"
@@ -404,8 +419,9 @@ core.listTheTomb = function(tombList)
         end
 
         for _, tombID in pairs(listOfTombID) do
-            if data.ownedAmulets[tombID] and tombID:lower():match(key:lower()) then
-                local tombB = tombList:createBlock {}
+            if core.ownedAmulets[tombID] and tombID:lower():match(key:lower()) then
+                local tombB =
+                    sourcemodBlock:createBlock {id = tes3ui.registerID("ata_kindi_tombblock_" .. tombID:match("%w+"))}
                 tombB.autoWidth = true
                 tombB.height = 35
                 tombB.absolutePosAlignX = 0.5
@@ -421,6 +437,29 @@ core.listTheTomb = function(tombList)
                 tombYes:register(
                     "mouseClick",
                     function()
+                        if tes3.worldController.inputController:isKeyDown(config.hotkeyOpenModifier.keyCode) then
+                            if not tes3.mobilePlayer:equip {item = core.ownedAmulets[tombID]} then
+                                tes3.transferItem {
+                                    from = data.storageCrate,
+                                    to = tes3.player,
+                                    item = core.ownedAmulets[tombID],
+                                    playSound = false
+                                }
+                                tes3.playSound {sound = "mysticism area", pitch = 0.7}
+                                tes3.mobilePlayer:equip {item = core.ownedAmulets[tombID]}
+                            end
+                            core.listTheTomb(tombList)
+                            return
+                        elseif tes3.worldController.inputController:isKeyDown(tes3.scanCode.lAlt) then
+                            if sourceMod:match("Morrowind") then
+                                os.openURL("https://en.uesp.net/wiki/Morrowind:" .. tombID:gsub("%s", "_"))
+                            elseif sourceMod:match("Mainland") then
+                                os.openURL("https://en.uesp.net/wiki/Tamriel_Rebuilt:" .. tombID:gsub("%s", "_"))
+                            else
+                                os.openURL("https://www.google.com/search?q=" .. tombID:gsub("%s", "+"))
+                            end
+                            return
+                        end
                         timer.start {
                             type = timer.real,
                             duration = 0.05,
@@ -440,14 +479,14 @@ core.listTheTomb = function(tombList)
                 tombYes:register(
                     "help",
                     function(e)
-                        local tooltip = tes3ui.createTooltipMenu {item = data.ownedAmulets[tombID]}
+                        local tooltip = tes3ui.createTooltipMenu {item = core.ownedAmulets[tombID]}
                         local divider = tooltip:createDivider {}
                         local label = tooltip:createLabel {text = "Click to teleport to the Tomb"}
                         label.color = {0.90, 0.30, 0.00}
                     end
                 )
 
-                local isInStorage = data.storageCrate.object.inventory:contains(data.ownedAmulets[tombID])
+                local isInStorage = data.storageCrate.object.inventory:contains(core.ownedAmulets[tombID])
                 local tombLock = tombB:createTextSelect {}
                 tombLock.text = isInStorage and " -" or " +"
                 tombLock.widget.idleActive = tes3ui.getPalette("link_color")
@@ -465,7 +504,7 @@ core.listTheTomb = function(tombList)
                                     tes3.transferItem {
                                         from = data.storageCrate,
                                         to = tes3.player,
-                                        item = data.ownedAmulets[tombID],
+                                        item = core.ownedAmulets[tombID],
                                         playSound = false
                                     }
                                     tes3.playSound {sound = "mysticism area", pitch = 0.7}
@@ -473,7 +512,7 @@ core.listTheTomb = function(tombList)
                                     tes3.transferItem {
                                         from = tes3.player,
                                         to = data.storageCrate,
-                                        item = data.ownedAmulets[tombID],
+                                        item = core.ownedAmulets[tombID],
                                         playSound = false
                                     }
                                     tes3.playSound {sound = "mysticism area", pitch = 1.3}
@@ -484,7 +523,8 @@ core.listTheTomb = function(tombList)
                     end
                 )
             elseif core.alternate and insideDummy[tombID] and tombID:lower():match(key:lower()) then
-                local tombB1 = tombList:createBlock {}
+                local tombB1 =
+                    sourcemodBlock:createBlock {id = tes3ui.registerID("ata_kindi_tombblock_" .. tombID:match("%w+"))}
                 tombB1.autoWidth = true
                 tombB1.height = 35
                 tombB1.absolutePosAlignX = 0.5
@@ -507,7 +547,7 @@ core.listTheTomb = function(tombList)
                                     item = insideDummy[tombID],
                                     playSound = true
                                 }
-                                data.ownedAmulets[tombID] = insideDummy[tombID]
+                                core.ownedAmulets[tombID] = insideDummy[tombID]
                                 tes3.playSound {soundPath = ("vo\\misc\\hit heart %s.mp3"):format(math.random(4))}
                             end
                             core.listTheTomb(tombList)
@@ -516,10 +556,11 @@ core.listTheTomb = function(tombList)
                 )
             end
             if
-                outsideDummy[tombID] and not data.ownedAmulets[tombID] and core.alternate and
+                outsideDummy[tombID] and not core.ownedAmulets[tombID] and core.alternate and
                     tombID:lower():match(key:lower())
              then
-                local tombB2 = tombList:createBlock {}
+                local tombB2 =
+                    sourcemodBlock:createBlock {id = tes3ui.registerID("ata_kindi_tombblock_" .. tombID:match("%w+"))}
                 tombB2.autoWidth = true
                 tombB2.height = 35
                 tombB2.absolutePosAlignX = 0.5
@@ -556,28 +597,39 @@ core.listTheTomb = function(tombList)
     end
 
     if core.alternate and key == "" then
-        local rejectedTombsLabel = tombList:createLabel {}
-        rejectedTombsLabel.widthProportional = 0.1
-        rejectedTombsLabel.text =
-            ("\n%s Tomb Doors Rejected\n"):format(table.size(tes3.player.data.ata_kindi_data.rejectedTombs))
+        local rejectedTombsBlock = tombList:createBlock {id = tes3ui.registerID("ata_kindi_zzzz_rejects")}
+        rejectedTombsBlock.autoHeight = true
+        rejectedTombsBlock.autoWidth = true
+        rejectedTombsBlock.flowDirection = "top_to_bottom"
+        rejectedTombsBlock.widthProportional = 1.0
+        rejectedTombsBlock.borderAllSides = 3
+        --rejectedTombsBlock.absolutePosAlignX = 0.5 --why dont this work except using ui inspector?
+        local rejectedTombsLabel = rejectedTombsBlock:createLabel {}
+        rejectedTombsLabel.text = ("\n%s Tomb Doors Rejected\n"):format(table.size(data.rejectedTombs))
         rejectedTombsLabel.wrapText = true
         rejectedTombsLabel.justifyText = "center"
-        for tombID, door in pairs(tes3.player.data.ata_kindi_data.rejectedTombs) do
-            local rejectedTombs = tombList:createLabel {}
-            rejectedTombs.widthProportional = 0.1
-            rejectedTombs.text = tombID .. " from " .. door.cell.id .. "\n"
-            rejectedTombs.wrapText = true
-            rejectedTombs.justifyText = "center"
+        for tombID, door in pairs(data.rejectedTombs) do
+            rejectedTombsLabel =
+                rejectedTombsBlock:createLabel {id = tes3ui.registerID("ata_kindi_rejected_" .. tombID:match("%w+"))}
+            rejectedTombsLabel.text = tombID .. " from " .. door.cell.id .. "\n"
+            rejectedTombsLabel.wrapText = true
+            rejectedTombsLabel.justifyText = "center"
         end
     end
+
+    tombList:sortChildren(
+        function(a, b)
+            return a.name < b.name
+        end
+    )
 
     menus:updateLayout()
     scroll.widget:contentsChanged()
 end
 
-core.showTombList = function(openedFromMCM)
+core.tableMenu = function(openedFromMCM)
     tes3ui.getMenuOnTop():destroy()
-    data.ownedAmulets = {}
+    core.ownedAmulets = {}
     core.alternate = openedFromMCM or tes3.worldController.inputController:isKeyDown(config.hotkeyOpenModifier.keyCode)
 
     for _, stack in pairs(tes3.player.object.inventory) do
@@ -586,7 +638,7 @@ core.showTombList = function(openedFromMCM)
                 stack.variables and stack.variables[1].data and stack.variables[1].data.tomb and
                     tes3.getCell {id = stack.variables[1].data.tomb}
              then
-                data.ownedAmulets[stack.variables[1].data.tomb] = stack.object
+                core.ownedAmulets[stack.variables[1].data.tomb] = stack.object
             end
         end
     end
@@ -597,12 +649,12 @@ core.showTombList = function(openedFromMCM)
                 stack.variables and stack.variables[1].data and stack.variables[1].data.tomb and
                     tes3.getCell {id = stack.variables[1].data.tomb}
              then
-                data.ownedAmulets[stack.variables[1].data.tomb] = stack.object
+                core.ownedAmulets[stack.variables[1].data.tomb] = stack.object
             end
         end
     end
 
-    local nOwnedAmulets = table.size(data.ownedAmulets)
+    local nOwnedAmulets = table.size(core.ownedAmulets)
 
     local menu = tes3ui.createMenu({id = ata_kindi_menuId, dragFrame = true, fixedFrame = false})
     menu.text = "Table of Ancestral Tomb Amulets"
@@ -657,8 +709,21 @@ core.showTombList = function(openedFromMCM)
     buttonBlock.autoWidth = true
     buttonBlock.autoHeight = true
 
-    local closeButton = buttonBlock:createButton {id = ata_kindi_buttonClose}
-    closeButton.text = "Close"
+    local closeButton =
+        buttonBlock:createImageButton {
+        id = ata_kindi_buttonClose,
+        idle = "Icons\\kindi\\exitidle.tga",
+        over = "Icons\\kindi\\exitover.tga",
+        pressed = "Icons\\kindi\\exitover.tga"
+    }
+    closeButton.height = 32
+    closeButton.width = 32
+    closeButton.absolutePosAlignX = 1.0
+    for i = 1, #closeButton.children do
+        closeButton.children[i].height = 32
+        closeButton.children[i].width = 32
+        closeButton.children[i].scaleMode = true
+    end
     closeButton:register(
         "mouseClick",
         function()
@@ -672,33 +737,59 @@ core.showTombList = function(openedFromMCM)
         end
     )
 
-    local storeAllButton = buttonBlock:createButton {}
-    storeAllButton.text = "Store All"
+    local storeAllButton =
+        buttonBlock:createImageButton {
+        id = ata_kindi_buttonStoreAll,
+        idle = "Icons\\kindi\\storeidle.tga",
+        over = "Icons\\kindi\\storeover.tga",
+        pressed = "Icons\\kindi\\storeover.tga"
+    }
+    storeAllButton.height = 32
+    storeAllButton.width = 32
+    for i = 1, #storeAllButton.children do
+        storeAllButton.children[i].height = 32
+        storeAllButton.children[i].width = 32
+        storeAllButton.children[i].scaleMode = true
+    end
     storeAllButton:register(
         "mouseClick",
         function()
             local successful
             for _, amulet in pairs(tes3.player.object.inventory) do
-                if amulet.object.id:startswith("ata_kindi_amulet_") then
-                    successful =
-                        tes3.transferItem {
-                        from = tes3.player,
-                        to = data.storageCrate,
-                        item = amulet.object.id,
-                        playSound = false
-                    }
+                if amulet.object.slot == tes3.clothingSlot.amulet then
+                    if amulet.object.id:startswith("ata_kindi_amulet_") then
+                        successful =
+                            tes3.transferItem {
+                            from = tes3.player,
+                            to = data.storageCrate,
+                            item = amulet.object.id,
+                            playSound = false
+                        }
+                    end
                 end
             end
             core.listTheTomb(tombList)
             if successful then
-                tes3.messageBox("All amulets stored")
+                tes3.messageBox {message = "All amulets stored.", duration = 0.5}
                 tes3.playSound {sound = "mysticism area", pitch = 1.3}
             end
         end
     )
 
-    local returnAllButton = buttonBlock:createButton {}
-    returnAllButton.text = "Return All"
+    local returnAllButton =
+        buttonBlock:createImageButton {
+        id = ata_kindi_buttonReturnAll,
+        idle = "Icons\\kindi\\returnidle.tga",
+        over = "Icons\\kindi\\returnover.tga",
+        pressed = "Icons\\kindi\\returnover.tga"
+    }
+    returnAllButton.height = 32
+    returnAllButton.width = 32
+    for i = 1, #returnAllButton.children do
+        returnAllButton.children[i].height = 32
+        returnAllButton.children[i].width = 32
+        returnAllButton.children[i].scaleMode = true
+    end
     returnAllButton:register(
         "mouseClick",
         function()
@@ -714,19 +805,85 @@ core.showTombList = function(openedFromMCM)
             end
             core.listTheTomb(tombList)
             if successful then
-                tes3.messageBox("All amulets returned")
+                tes3.messageBox {message = "All amulets returned.", duration = 0.5}
                 tes3.playSound {sound = "mysticism area", pitch = 0.7}
             end
+        end
+    )
+
+    local options =
+        buttonBlock:createImageButton {
+        id = ata_kindi_buttonOptions,
+        idle = "Icons\\kindi\\optionsidle.tga",
+        over = "Icons\\kindi\\optionsover.tga",
+        pressed = "Icons\\kindi\\optionsover.tga"
+    }
+    options.height = 32
+    options.width = 32
+    for i = 1, #options.children do
+        options.children[i].height = 32
+        options.children[i].width = 32
+        options.children[i].scaleMode = true
+    end
+    options:register(
+        "mouseClick",
+        function()
+            menu.visible = false
+            menu.disabled = true
+            --disable right click button code by replacing it with a fake code. Taken from no combat menu
+            tes3.worldController.inputController.inputMaps[19].code = 5000
+            --unhide the options menu and hide the table menu
+            if tes3ui.findMenu(ata_kindi_OptionsMenu) then
+                tes3ui.findMenu(ata_kindi_OptionsMenu).visible = true
+                tes3ui.findMenu(ata_kindi_OptionsMenu).disabled = false
+            else
+				tes3.messageBox("NSOSOSOSOSOOS")
+                core.optionMenu()
+            end
+			tes3ui.acquireTextInput(nil)
+            core.tipsMessage =
+                tes3.messageBox {message = "Click on an icon to toggle activation", duration = 2, showInDialog = false}
+        end
+    )
+
+    local switchTable =
+        buttonBlock:createImageButton {
+        id = ata_kindi_buttonSwitchTable,
+        idle = "Icons\\kindi\\alternatetableidle.tga",
+        over = "Icons\\kindi\\alternatetableover.tga",
+        pressed = "Icons\\kindi\\alternatetableover.tga"
+    }
+    switchTable.height = 32
+    switchTable.width = 32
+    for i = 1, #switchTable.children do
+        switchTable.children[i].height = 32
+        switchTable.children[i].width = 32
+        switchTable.children[i].scaleMode = true
+    end
+    switchTable:register(
+        "mouseClick",
+        function()
+            local todd = tes3ui.findMenu(ata_kindi_menuId)
+            if not todd then
+                return
+            end
+            data.menuPosx = todd.positionX
+            data.menuPosy = todd.positiony
+            data.menuWidth = todd.width
+            data.menuHeight = todd.height
+            todd:destroy()
+
+            core.tableMenu(not core.alternate)
         end
     )
 
     local input = buttonBlock:createTextInput {id = ata_kindi_input}
     input.borderLeft = 5
     input.borderRight = 5
-    input.borderTop = 2
-    input.borderBottom = 4
+    input.borderTop = 5
+    input.borderBottom = 5
     input.font = 1
-    input.widget.lengthLimit = nil
+    input.widget.lengthLimit = 31
     input.widget.eraseOnFirstKey = true
     input:register(
         "keyPress",
@@ -750,8 +907,225 @@ core.showTombList = function(openedFromMCM)
     tes3ui.enterMenuMode(ata_kindi_menuId)
     menu:updateLayout()
     tes3ui.acquireTextInput(input)
+    input.color = tes3ui.getPalette(disabled_color)
 end
 
+core.optionMenu = function(static)
+    local optionsMenu = tes3ui.createMenu({id = ata_kindi_OptionsMenu, dragFrame = true, fixedFrame = false})
+    optionsMenu.text = "Minor gameplay"
+    optionsMenu.width = 300
+    optionsMenu.height = 450
+    optionsMenu.minWidth = 300
+    optionsMenu.minHeight = 450
+    optionsMenu.maxWidth = 300
+    optionsMenu.maxHeight = 450
+    optionsMenu.positionX = static and static[1] or optionsMenu.width / -2
+    optionsMenu.positionY = static and static[2] or optionsMenu.height / 2
+    optionsMenu.alpha = tes3.worldController.menuAlpha
+
+    local list = optionsMenu:createVerticalScrollPane {id = tes3ui.registerID("optionmenulist")}
+    list.borderBottom = 32
+    list.widget.positionY = static and static[3] or 0
+
+    local optionsMainBlock = list:createBlock {id = tes3ui.registerID("optionsmainblock")}
+    optionsMainBlock.autoWidth = true
+    optionsMainBlock.autoHeight = true
+    optionsMainBlock.flowDirection = "top_to_bottom"
+    optionsMainBlock.widthProportional = 1.0
+    optionsMainBlock.borderAllSides = 1
+
+    local iconenabled = "Icons\\kindi\\autoequipamuletover.tga"
+    local icondisabled = "Icons\\kindi\\autoequipamuletidle.tga"
+    local optionsAutoEquipTombCombat =
+        optionsMainBlock:createImageButton {
+        idle = config.autoequipamuletattacked and iconenabled or icondisabled,
+        over = config.autoequipamuletattacked and iconenabled or icondisabled,
+        pressed = config.autoequipamuletattacked and icondisabled or iconenabled
+    }
+    optionsAutoEquipTombCombat.height = 64
+    optionsAutoEquipTombCombat.width = 64
+    optionsAutoEquipTombCombat.absolutePosAlignX = 0.5
+    for i = 1, #optionsAutoEquipTombCombat.children do
+        optionsAutoEquipTombCombat.children[i].height = 64
+        optionsAutoEquipTombCombat.children[i].width = 64
+        optionsAutoEquipTombCombat.children[i].scaleMode = true
+    end
+
+    optionsAutoEquipTombCombat:register(
+        "mouseClick",
+        function()
+            local scrollPosY = list.widget.positionY
+            config.autoequipamuletattacked = not config.autoequipamuletattacked
+            optionsMenu:destroy()
+            core.optionMenu({optionsMenu.positionX, optionsMenu.positionY, scrollPosY})
+            tes3.playSound {sound = "menu click"}
+        end
+    )
+
+    local optionsAutoEquipTombCombatLabel = optionsMainBlock:createLabel {}
+    optionsAutoEquipTombCombatLabel.text =
+        "The tomb amulet auto-equips when attacked by certain enemies or when opening traps in the tomb"
+    optionsAutoEquipTombCombatLabel.wrapText = true
+    optionsAutoEquipTombCombatLabel.justifyText = "center"
+    optionsAutoEquipTombCombatLabel.widthProportional = 0
+    optionsAutoEquipTombCombatLabel.heightProportional = 0
+    -------------------------------------------------------------------------------------------------
+    optionsMainBlock:createDivider {}
+    -------------------------------------------------------------------------------------------------
+    local iconenabled1 = "Icons\\kindi\\optionsprotectwearerover.tga"
+    local icondisabled1 = "Icons\\kindi\\optionsprotectweareridle.tga"
+    local optionsUndeadProtectWearer =
+        optionsMainBlock:createImageButton {
+        idle = config.undeadprotectwearer and iconenabled1 or icondisabled1,
+        over = config.undeadprotectwearer and iconenabled1 or icondisabled1,
+        pressed = config.undeadprotectwearer and icondisabled1 or iconenabled1
+    }
+    optionsUndeadProtectWearer.height = 64
+    optionsUndeadProtectWearer.width = 64
+    optionsUndeadProtectWearer.absolutePosAlignX = 0.5
+    for i = 1, #optionsUndeadProtectWearer.children do
+        optionsUndeadProtectWearer.children[i].height = 64
+        optionsUndeadProtectWearer.children[i].width = 64
+        optionsUndeadProtectWearer.children[i].scaleMode = true
+    end
+    optionsUndeadProtectWearer:register(
+        "mouseClick",
+        function()
+            local scrollPosY = list.widget.positionY
+            config.undeadprotectwearer = not config.undeadprotectwearer
+            optionsMenu:destroy()
+            core.optionMenu({optionsMenu.positionX, optionsMenu.positionY, scrollPosY})
+            tes3.playSound {sound = "menu click"}
+        end
+    )
+
+    local optionsUndeadProtectWearerLabel = optionsMainBlock:createLabel {}
+    optionsUndeadProtectWearerLabel.text = "The undead of the tomb defends the amulet wearer"
+    optionsUndeadProtectWearerLabel.wrapText = true
+    optionsUndeadProtectWearerLabel.justifyText = "center"
+    optionsUndeadProtectWearerLabel.widthProportional = 0
+    optionsUndeadProtectWearerLabel.heightProportional = 0
+    -------------------------------------------------------------------------------------------------
+    optionsMainBlock:createDivider {}
+    -------------------------------------------------------------------------------------------------
+    local iconenabled2 = "Icons\\kindi\\unlockdisarmtombover.tga"
+    local icondisabled2 = "Icons\\kindi\\unlockdisarmtombidle.tga"
+    local optionsUnlockDisarmTomb =
+        optionsMainBlock:createImageButton {
+        idle = config.unlockdisarmtomb and iconenabled2 or icondisabled2,
+        over = config.unlockdisarmtomb and iconenabled2 or icondisabled2,
+        pressed = config.unlockdisarmtomb and icondisabled2 or iconenabled2
+    }
+    optionsUnlockDisarmTomb.height = 64
+    optionsUnlockDisarmTomb.width = 64
+    optionsUnlockDisarmTomb.absolutePosAlignX = 0.5
+    for i = 1, #optionsUnlockDisarmTomb.children do
+        optionsUnlockDisarmTomb.children[i].height = 64
+        optionsUnlockDisarmTomb.children[i].width = 64
+        optionsUnlockDisarmTomb.children[i].scaleMode = true
+    end
+    optionsUnlockDisarmTomb:register(
+        "mouseClick",
+        function()
+            local scrollPosY = list.widget.positionY
+            config.unlockdisarmtomb = not config.unlockdisarmtomb
+            optionsMenu:destroy()
+            core.optionMenu({optionsMenu.positionX, optionsMenu.positionY, scrollPosY})
+            tes3.playSound {sound = "menu click"}
+        end
+    )
+
+    local optionsUndeadProtectWearerLabel = optionsMainBlock:createLabel {}
+    optionsUndeadProtectWearerLabel.text = "The tomb traps and locks are neutralized against the amulet wearer"
+    optionsUndeadProtectWearerLabel.wrapText = true
+    optionsUndeadProtectWearerLabel.justifyText = "center"
+    optionsUndeadProtectWearerLabel.widthProportional = 0
+    optionsUndeadProtectWearerLabel.heightProportional = 0
+    -------------------------------------------------------------------------------------------------
+    optionsMainBlock:createDivider {}
+    -------------------------------------------------------------------------------------------------
+    local iconenabled3 = "Icons\\kindi\\familymembersfriendlyover.tga"
+    local icondisabled3 = "Icons\\kindi\\familymembersfriendlyidle.tga"
+    local familyMembersFriendlyOnce =
+        optionsMainBlock:createImageButton {
+        idle = config.familymembersfriendlyonce and iconenabled3 or icondisabled3,
+        over = config.familymembersfriendlyonce and iconenabled3 or icondisabled3,
+        pressed = config.familymembersfriendlyonce and icondisabled3 or iconenabled3
+    }
+    familyMembersFriendlyOnce.height = 64
+    familyMembersFriendlyOnce.width = 64
+    familyMembersFriendlyOnce.absolutePosAlignX = 0.5
+    for i = 1, #familyMembersFriendlyOnce.children do
+        familyMembersFriendlyOnce.children[i].height = 64
+        familyMembersFriendlyOnce.children[i].width = 64
+        familyMembersFriendlyOnce.children[i].scaleMode = true
+    end
+    familyMembersFriendlyOnce:register(
+        "mouseClick",
+        function()
+            local scrollPosY = list.widget.positionY
+            config.familymembersfriendlyonce = not config.familymembersfriendlyonce
+            optionsMenu:destroy()
+            core.optionMenu({optionsMenu.positionX, optionsMenu.positionY, scrollPosY})
+            tes3.playSound {sound = "menu click"}
+        end
+    )
+
+    local familyMembersFriendlyOnceLabel = optionsMainBlock:createLabel {}
+    familyMembersFriendlyOnceLabel.text =
+        "Hostile NPCs become friendly with the wearer of an amulet inscribed with their surname (affects once)"
+    familyMembersFriendlyOnceLabel.wrapText = true
+    familyMembersFriendlyOnceLabel.justifyText = "center"
+    familyMembersFriendlyOnceLabel.widthProportional = 0
+    familyMembersFriendlyOnceLabel.heightProportional = 0
+    -------------------------------------------------------------------------------------------------
+    optionsMainBlock:createDivider {}
+    -------------------------------------------------------------------------------------------------
+    local optionsCloseButtonBlock = optionsMenu:createBlock {}
+    optionsCloseButtonBlock.flowDirection = "left_to_right"
+    optionsCloseButtonBlock.widthProportional = 1.0
+    optionsCloseButtonBlock.absolutePosAlignY = 1.0
+    optionsCloseButtonBlock.absolutePosAlignX = 1.0
+    optionsCloseButtonBlock.height = 32
+    optionsCloseButtonBlock.borderTop = 3
+    optionsCloseButtonBlock.autoWidth = true
+    optionsCloseButtonBlock.autoHeight = true
+
+    local optionsCloseButton =
+        optionsCloseButtonBlock:createImageButton {
+        idle = "Icons\\kindi\\exitidle.tga",
+        over = "Icons\\kindi\\exitover.tga",
+        pressed = "Icons\\kindi\\exitover.tga"
+    }
+    optionsCloseButton.height = 32
+    optionsCloseButton.width = 32
+    for i = 1, #optionsCloseButton.children do
+        optionsCloseButton.children[i].height = 32
+        optionsCloseButton.children[i].width = 32
+        optionsCloseButton.children[i].scaleMode = true
+    end
+    optionsCloseButton:register(
+        "mouseClick",
+        function()
+            --hide the options menu and unhide the amulet table
+            optionsMenu.visible = false
+            optionsMenu.disabled = true
+            if tes3ui.findMenu(ata_kindi_menuId) then
+                tes3ui.findMenu(ata_kindi_menuId).visible = true
+                tes3ui.findMenu(ata_kindi_menuId).disabled = false
+            else
+                core.tableMenu()
+            end
+            --restore original right click button
+            tes3.worldController.inputController.inputMaps[19].code = data.menuModeCode
+			tes3ui.acquireTextInput(tes3ui.findMenu(ata_kindi_menuId):findChild(ata_kindi_input))
+            mwse.saveConfig("ancestral_tomb_amulets", config)
+        end
+    )
+    optionsMenu:updateLayout()
+    optionsMenu:updateLayout()
+    list.widget:contentsChanged()
+end
 ------------------------------------------------------------
 -----------------------CHEATS-------------------------------
 ------------------------------------------------------------
@@ -778,10 +1152,16 @@ core.amuletInfoCheat = function(dataT)
         end
     end
 
-    if refs then
+    if refs and refs.object.inventory then
         return ("Located in: %s\nInside: %s %s\n"):format(
             refs.cell,
             refs.object.name,
+            refs.disabled and "(Disabled)" or ""
+        )
+	elseif refs then
+        return ("Located in: %s\nCoordinates: %s %s\n"):format(
+            refs.cell,
+            refs.position:copy(),
             refs.disabled and "(Disabled)" or ""
         )
     else
@@ -808,32 +1188,70 @@ end
 ------------------------UTILITY-----------------------------
 ------------------------------------------------------------
 
+core.refresh = function(count)
+	local save = {}
+	for _, amulet in pairs(tes3.player.object.inventory) do
+		if string.match(amulet.object.id, "ata_kindi_amulet_") then
+			if amulet.variables and amulet.variables[1].data.tomb and tes3.getCell{id = amulet.variables[1].data.tomb} then
+				local tomb = amulet.variables[1].data.tomb
+				if data.allAmulets[tomb] and data.superCrate.object.inventory:contains(data.allAmulets[tomb]) then
+					mwse.log("ATA Clean: Found [%s, %s] with bad data, fixed.", amulet.object.id, amulet.object.name)
+					tes3.removeItem{reference = tes3.player, item = amulet.object.id, playSound = false}
+					table.insert(save, tomb)
+					count = count + 1
+				elseif data.allAmulets[tomb] ~= amulet.object.id then
+					mwse.log("ATA Clean: Found [%s, %s] with bad reference, fixed.", amulet.object.id, amulet.object.name)
+					tes3.removeItem{reference = tes3.player, item = amulet.object.id, playSound = false}
+					count = count + 1
+				end
+			end
+		end
+	end
+
+	for _, tomb in pairs(save) do
+		tes3.transferItem{
+		from = data.superCrate,
+		to = tes3.player,
+		item = data.allAmulets[tomb],
+		playSound = false
+		}
+	end
+
+	for _, amulet in pairs(data.superCrate.object.inventory) do
+		if not table.find(data.allAmulets, amulet.object.id) then
+			mwse.log("ATA Clean: Found [%s, %s] with bad data, fixed.", amulet.object.id, amulet.object.name)
+			tes3.removeItem{reference = data.superCrate, item = amulet.object.id, count = 9999}
+			count = count + 1
+		end
+	end
+
+	tes3.messageBox("Clean operation completed. Info in mwse.log")
+	mwse.log("ATA Clean: Operation completed with %s issues", (count ~= 0) and count.." fixed" or "no")
+end
+
 core.dropBad = function()
+	local count = 0
     for _, cell in pairs(tes3.dataHandler.nonDynamicData.cells) do
         for amulet in cell:iterateReferences(tes3.objectType.clothing) do
-            if string.match(amulet.id, "ata_kindi_amulet_") then
-                if not tes3.getCell {id = amulet.data.tomb} then
-                    tes3.messageBox("Dropping bad reference " .. amulet.id)
-                    mwse.log(
-                        "[[Ancestral Tomb Amulets log]] ~ Dropping bad reference " ..
-                            amulet.id .. " ( " .. amulet.name .. " ) "
-                    )
+            if string.find(amulet.id, "ata_kindi_amulet_") then
+                if not tes3.getCell {id = amulet.data.tomb} or data.allAmulets[amulet.data.tomb] ~= amulet.id then
+                    mwse.log("ATA Clean: Found [%s, %s] with bad reference, fixed.", amulet.object.id, amulet.object.name)
+                    amulet.itemData = nil
                     amulet.modified = false
-                    mwscript.setDelete {reference = amulet}
+                    amulet:disable()
+                    mwscript.setDelete {reference = amulet, delete = true}
+					count = count + 1
                 end
             end
         end
         for cont in cell:iterateReferences(tes3.objectType.container, tes3.objectType.actor) do
             for k, amulet in pairs(cont.object.inventory) do
                 if string.match(amulet.object.id, "ata_kindi_amulet_") then
-                    if not tes3.getCell {id = amulet.variables[1].data.tomb} then
-                        tes3.messageBox("Dropping bad reference " .. amulet.object.id)
-                        mwse.log(
-                            "[[Ancestral Tomb Amulets log]] ~ Dropping bad reference " ..
-                                amulet.object.id .. " ( " .. amulet.object.name .. " ) "
-                        )
+                    if not tes3.getCell {id = amulet.variables[1].data.tomb} or data.allAmulets[amulet.variables[1].data.tomb] ~= amulet.object.id then
+						mwse.log("ATA Clean: Found [%s, %s] with bad reference, fixed.", amulet.object.id, amulet.object.name)
                         amulet.object.modified = false
-                        tes3.removeItem {reference = cont, item = amulet.object.id, playSound = false}
+                        tes3.removeItem {reference = cont, item = amulet.object.id, playSound = false, count = 9999}
+						count = count + 1
                     end
                 end
             end
@@ -842,41 +1260,42 @@ core.dropBad = function()
     for k, amulet in pairs(tes3.player.object.inventory) do
         if string.match(amulet.object.id, "ata_kindi_amulet_") then
             if not tes3.getCell {id = amulet.variables[1].data.tomb} then
-                tes3.messageBox("Dropping bad reference " .. amulet.object.id)
-                mwse.log(
-                    "[[Ancestral Tomb Amulets log]] ~ Dropping bad reference " ..
-                        amulet.object.id .. " ( " .. amulet.object.name .. " ) "
-                )
+				mwse.log("ATA Clean: Found [%s, %s] with bad reference, fixed.", amulet.object.id, amulet.object.name)
                 amulet.object.modified = false
                 tes3.mobilePlayer:unequip {item = amulet.object.id}
-                tes3.removeItem {reference = tes3.player, item = amulet.object.id, playSound = false}
+                tes3.removeItem {reference = tes3.player, item = amulet.object.id, playSound = false, count = 9999}
+				count = count + 1
             end
         end
     end
+
+	core.refresh(count)
 end
 
 core.hardReset = function(uninstall)
     tes3.messageBox("Reset executed..")
 
     local instances = 0
+    tes3.player.data.ata_kindi_data = {}
     tes3.player.data.ata_kindi_data.defaultTombs = {}
     tes3.player.data.ata_kindi_data.customTombs = {}
-    tes3.player.data.ata_kindi_data.rejectedTombs = {}
+    data.rejectedTombs = {}
     tes3.player.data.ata_kindi_data.modifiedAmulets = {}
     tes3.player.data.ata_kindi_data.traversedCells = {}
 
     for _, cell in pairs(tes3.dataHandler.nonDynamicData.cells) do
-        --if cell.id ~= "atakindidummycell" then
         --remove all references of amulet
         for cloths in cell:iterateReferences(tes3.objectType.clothing) do
             if string.startswith(cloths.id, "ata_kindi_amulet_") then
                 mwse.log(cloths.id .. "(" .. cloths.object.name .. ")" .. " has been removed in " .. cell.id)
+                cloths.itemData = nil
                 cloths.modified = false
-                cloths.data.tomb = nil
-                mwscript.setDelete {reference = cloths}
+                cloths:disable()
+                mwscript.setDelete {reference = cloths, delete = true}
                 instances = instances + 1
             end
         end
+
         --remove all amulets from inventories
         for instance in cell:iterateReferences(tes3.objectType.actor) do
             if instance.object and instance.object.inventory then
@@ -887,12 +1306,13 @@ core.hardReset = function(uninstall)
                         if v.variables then
                             v.variables[1].data.tomb = nil
                         end
-                        tes3.removeItem {reference = instance, item = v.object.id}
+                        tes3.removeItem {reference = instance, item = v.object.id, count = 9999}
                         instances = instances + 1
                     end
                 end
             end
         end
+
         --remove all amulets from player
         for k, amulet in pairs(tes3.player.object.inventory) do
             if string.match(amulet.object.id, "ata_kindi_amulet_") then
@@ -904,11 +1324,10 @@ core.hardReset = function(uninstall)
                     amulet.variables[1].data.tomb = nil
                 end
                 tes3.mobilePlayer:unequip {item = amulet.object.id}
-                tes3.removeItem {reference = tes3.player, item = amulet.object.id}
+                tes3.removeItem {reference = tes3.player, item = amulet.object.id, 9999}
                 instances = instances + 1
             end
         end
-        --end
     end
 
     mwse.log("Ancestral Tomb Amulet resetting.. " .. instances .. " instances has been deleted")
@@ -918,6 +1337,16 @@ core.hardReset = function(uninstall)
         tes3.player.data.ata_kindi_data = nil
     else
         core.initialize()
+    end
+end
+
+core.refreshMCM = function()
+    local MCMModList = tes3ui.findMenu(tes3ui.registerID("MWSE:ModConfigMenu")).children
+
+    for child in table.traverse(MCMModList) do
+        if child.text == "Ancestral Tomb Amulets" then
+            child:triggerEvent("mouseClick")
+        end
     end
 end
 

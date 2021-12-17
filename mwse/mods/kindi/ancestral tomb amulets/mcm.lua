@@ -52,14 +52,9 @@ switch:createButton {
         config.hotkeyOpenTable = {keyCode = tes3.scanCode.k}
         config.hotkeyOpenModifier = {keyCode = tes3.scanCode.lShift}
 
-        local MCMModList = tes3ui.findMenu(tes3ui.registerID("MWSE:ModConfigMenu")):findChild(-1155).children
+        core.refreshMCM()
 
-        for _, child in ipairs(MCMModList) do
-            if child.text == "Ancestral Tomb Amulets" then
-                child:triggerEvent("mouseClick")
-                tes3.messageBox("Settings reset to Defaults")
-            end
-        end
+        tes3.messageBox("Settings reset to Defaults")
     end
 }
 
@@ -120,8 +115,8 @@ keybind:createKeyBinder {
     }
 }
 
-local smartPlace = page:createCategory("Gameplay")
-smartPlace:createYesNoButton {
+local gameplay = page:createCategory("Gameplay")
+gameplay:createYesNoButton {
     label = "Chance will also depend on cell danger factor",
     variable = EasyMCM.createTableVariable {id = "dangerFactor", table = config},
     description = "Dangerous cells, ie. cells that contain powerful enemies or many aggressive actors will have a higher chance to have an amulet inside\nFor example, there is a better chance to find an amulet inside a daedric or dwemer ruin compared to common houses or town buildings.\nThe chance from this will be added to the base chance.",
@@ -134,7 +129,7 @@ smartPlace:createYesNoButton {
     end
 }
 
-smartPlace:createYesNoButton {
+gameplay:createYesNoButton {
     label = "Remove and recycle amulet",
     variable = EasyMCM.createTableVariable {id = "removeRecycle", table = config},
     description = "If an amulet is inside a cell but you exited the cell before obtaining it, the amulet will be removed from the cell and the next cell you visit will have 10% more chance to contain an amulet\nAny cell before this option is activated is not affected.\nThe chance from this will be added to the base chance.",
@@ -147,7 +142,7 @@ smartPlace:createYesNoButton {
     end
 }
 
-smartPlace:createYesNoButton {
+gameplay:createYesNoButton {
     label = "Best container",
     variable = EasyMCM.createTableVariable {id = "useBestCont", table = config},
     description = "Amulet will spawn inside the best container in the cell, ie. container with the largest capacity.\n",
@@ -160,7 +155,7 @@ smartPlace:createYesNoButton {
     end
 }
 
-smartPlace:createYesNoButton {
+gameplay:createYesNoButton {
     label = "Tomb raider",
     variable = EasyMCM.createTableVariable {id = "tombRaider", table = config},
     description = "An amulet can always be found inside its associated ancestral tomb if it has not been placed elsewhere yet (yellow)\nIf base chance is negative, this will have no effect.\nIgnores cell cycling.",
@@ -169,19 +164,6 @@ smartPlace:createYesNoButton {
             tes3.messageBox("Tomb raider")
         else
             tes3.messageBox("No tomb raiding")
-        end
-    end
-}
-
-smartPlace:createYesNoButton {
-    label = "Tomb guardian",
-    variable = EasyMCM.createTableVariable {id = "tombguardian", table = config},
-    description = "All undead inside the tomb will be friendly towards the amulet wearer\nIf the undead is already in combat, in will be pacified\nUnequipping amulet will cause the undead to become hostile again.",
-    callback = function()
-        if config.tombRaider then
-            tes3.messageBox("Tomb guardian")
-        else
-            tes3.messageBox("No tomb guardian")
         end
     end
 }
@@ -200,18 +182,84 @@ scripted:createYesNoButton {
     end
 }
 
-local page3 = template:createSideBarPage {label = "Other"}
+local page2 =
+    template:createExclusionsPage {
+    label = "Blocked Cells",
+    description = "Blocked cells will not spawn ancestral tomb amulets. They still count for cell cycling.\n",
+    toggleText = "Toggle Filtered Cells",
+    leftListLabel = "Blocked Cells",
+    rightListLabel = "Allowed Cells",
+    showAllBlocked = false,
+    variable = EasyMCM.createTableVariable {
+        id = "blockedCells",
+        table = config
+    },
+    filters = {
+        {
+            label = "Blacklist Cells",
+            callback = (function()
+                local tombs = {}
+                for _, cell in pairs(tes3.dataHandler.nonDynamicData.cells) do
+                    if cell.isInterior and cell.id ~= "atakindidummycell" then
+                        table.insert(tombs, cell.id)
+                    end
+                end
+                return tombs
+            end)
+        }
+    }
+}
+
+local page3 = template:createSideBarPage {label = "Help"}
 
 page3:createCategory {label = data.otherLabel}
 page3:createHyperlink {text = "Modpage", exec = string.format("start %s", data.links.modpage)}
 page3:createHyperlink {text = "Watch Demo", exec = string.format("start %s", data.links.video)}
 page3:createButton {
     inGameOnly = true,
-    label = "List of all Ancestral Tombs",
-    buttonText = "Ancestral Tombs",
-    description = "List of all Ancestral Tombs from all currently loaded plugins.\n\nAdditional feature (only in-game):\n\nGray color[Modifier+Hotkey]: This amulet does not exist yet\n\nYellow color[Modifier+Hotkey]: The amulet is somewhere in the world, but not in your inventory\n\nBlue color: Amulet for this tomb is in your inventory",
+    label = "Hints",
+    buttonText = "Hints",
+    description = "Table:\n\nGray color-> This amulet has not spawned yet\nYellow color-> The amulet is somewhere in the world, but not in your possession\nBlue color-> Amulet for this tomb is in your possession\nClick-> Teleport to the tomb\nModifier+Click-> Equip amulet\nAlt+Click-> Open Wiki\nShift+Hover-> Reveal the location of the amulet (yellow only)\nClick +/- -> Store or return the amulet\n\n\nGameplay:\n\nTomb Raider-> Set base chance to 0, and 'Tomb Raider' active to make amulets spawn only inside Ancestral Tombs\n",
     callback = function()
-        core.showTombList(true)
+        tes3.messageBox("Read")
+    end
+}
+
+page3:createButton {
+    inGameOnly = true,
+    label = "Fixes all bad amulets in the game",
+    buttonText = "Clean",
+    description = "If you feel there's an issue with the mod, this may fix your issue, otherwise help submit a bug report.\n\nUse as much as you can,",
+    callback = function()
+        core.dropBad()
+    end
+}
+
+page3:createButton {
+    inGameOnly = true,
+    label = "Reset all amulets",
+    buttonText = "Reset",
+    description = "Use this if you wish to recollect all amulets. Amulets will be recreated",
+    callback = function()
+        core.hardReset()
+    end
+}
+page3:createButton {
+    inGameOnly = true,
+    label = "Removes all amulets and progress from the game",
+    buttonText = "Uninstall",
+    description = "WARNING: All progress will be lost, mod will not function. To undo, press RESET\n",
+    callback = function()
+        core.hardReset(true)
+    end
+}
+page3:createButton {
+    inGameOnly = true,
+    label = "Give all amulets for all ancestral tombs in the game\nPress Reset button first before using",
+    buttonText = "Give All",
+    description = "Press RESET first before using.",
+    callback = function()
+        core.cheat()
     end
 }
 
@@ -237,42 +285,6 @@ page3:createOnOffButton {
         else
             tes3.messageBox("OFF")
         end
-    end
-}
-page3:createButton {
-    inGameOnly = true,
-    label = "Reset all amulets",
-    buttonText = "Reset",
-    description = "Use this if you wish to recollect all amulets. Amulets will be recreated.\n",
-    callback = function()
-        core.hardReset()
-    end
-}
-page3:createButton {
-    inGameOnly = true,
-    label = "Removes all amulets and progress from the game",
-    buttonText = "Uninstall",
-    description = "WARNING: Use this before uninstalling the mod completely. All progress will be lost.\n",
-    callback = function()
-        core.hardReset(true)
-    end
-}
-page3:createButton {
-    inGameOnly = true,
-    label = "Give all amulets for all ancestral tombs in the game\nPress Reset button first before using",
-    buttonText = "Give me",
-    description = "DEBUGGING ONLY: Use only for testing\nThere will be a delay/lag depending on the amount of amulets.\nIt is recommended to press reset first before using this.",
-    callback = function()
-        core.cheat()
-    end
-}
-page3:createButton {
-    inGameOnly = true,
-    label = "Removes all amulets without an associated tomb",
-    buttonText = "Clean bad references",
-    description = "There will be a delay/lag depending on the amount of amulets.\nThis is useful if you have uninstalled a mod that adds an ancestral tomb when this mod was active.",
-    callback = function()
-        core.dropBad()
     end
 }
 

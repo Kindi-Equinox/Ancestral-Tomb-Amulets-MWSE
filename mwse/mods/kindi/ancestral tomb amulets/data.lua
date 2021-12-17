@@ -1,31 +1,32 @@
 local data = {}
-ata_kindi_menuId = tes3ui.registerID("atakindimenu")
-ata_kindi_blockBarId = tes3ui.registerID("atakindiblockbar")
-ata_kindi_barId = tes3ui.registerID("atakindibar")
-ata_kindi_listId = tes3ui.registerID("atakindilist")
-ata_kindi_tombList = tes3ui.registerID("atakinditombList")
-ata_kindi_counterId = tes3ui.registerID("atakindicounter")
---[[ata_kindi_labelId = tes3ui.registerID("atakindilabel")
-ata_kindi_labelId2 = tes3ui.registerID("atakindilabel2")
-ata_kindi_labelId3 = tes3ui.registerID("atakindilabel3")
-ata_kindi_labelId4 = tes3ui.registerID("atakindilabel4")]]
-ata_kindi_pluginId = tes3ui.registerID("atakindiplugin")
-ata_kindi_buttonBlock = tes3ui.registerID("atakindibuttonblock")
-ata_kindi_buttonClose = tes3ui.registerID("atakindibuttonclose")
-ata_kindi_input = tes3ui.registerID("atakindiinput")
+ata_kindi_menuId = tes3ui.registerID("ATA_KNDI_TableMenu")
+ata_kindi_blockBarId = tes3ui.registerID("ata_kindi_blockBar")
+ata_kindi_barId = tes3ui.registerID("ata_kindi_fillbar")
+ata_kindi_listId = tes3ui.registerID("ata_kindi_scrollpane")
+ata_kindi_tombList = tes3ui.registerID("ata_kindi_tombList")
+ata_kindi_counterId = tes3ui.registerID("ata_kindi_counter")
+ata_kindi_buttonBlock = tes3ui.registerID("ata_kindi_buttons_Block")
+ata_kindi_buttonClose = tes3ui.registerID("ata_kindi_buttonClose")
+ata_kindi_buttonStoreAll = tes3ui.registerID("ata_kindi_buttonStoreAll")
+ata_kindi_buttonReturnAll = tes3ui.registerID("ata_kindi_buttonReturnAll")
+ata_kindi_buttonSwitchTable = tes3ui.registerID("ata_kindi_buttonSwitchTable")
+ata_kindi_buttonOptions = tes3ui.registerID("ata_kindi_buttonOptions")
+ata_kindi_OptionsMenu = tes3ui.registerID("ATA_KNDI_OptionsMenu")
+ata_kindi_input = tes3ui.registerID("ata_kindi_input")
 
+data.menuModeCode = nil
 data.menuWidth = nil
 data.menuHeight = nil
 data.menuPosx = nil
 data.menuPosy = nil
-data.ownedAmulets = {}
 data.storageCrate = nil
 data.superCrate = nil
-data.allAmulets = {}
+data.allAmulets = {} --k = tombid, v = amuletid, copied from modifiedamulets(created amulets)
 data.allTombs = {} --default + custom tombs
 data.source = {} --k = sourcemod, v = cellid
 data.plusChance = 0
-data.unusedDoors = {} --[[doors inside tomb without a destination, maybe useful in the future]]
+data.rejectedTombs = {}
+data.unusedDoors = {} --[[unknown doors]]
 
 data.tooltipsComplete = nil
 data.tooltipsCompleteIsInstalled =
@@ -38,6 +39,8 @@ else
 end
 
 data.meta = {}
+data.traitorCheck = {}
+
 
 --[[you can add your own mesh and icon path to be used by the mod]]
 --[[number of elements from both tables must be the same]]
@@ -89,7 +92,8 @@ data.tombExtra = {
 data.customAmuletTooltip = {
     ["Drethan Ancestral Tomb"] = "Extravagant jewellery of the Drethan family",
     ["Marvani Ancestral Tomb"] = "Unique ornament of the Marvani family",
-    ["Andrano Ancestral Tomb"] = "Magnificent gemstone of the Andrano family"
+    ["Andrano Ancestral Tomb"] = "Magnificent gemstone of the Andrano family",
+    ["Velas Ancestral Tomb"] = "Auspicious stone of the Velas family",
 }
 data.effects = {
     WaterBreathing = 0,
