@@ -4,8 +4,7 @@ local playerData
 local config
 
 local function initialize()
-    --this code is used to disable menu mode button
-    data.menuModeCode = tes3.worldController.inputController.inputMaps[19].code
+
 end
 
 local function amuletEquipped(this)

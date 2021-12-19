@@ -924,8 +924,6 @@ core.tableMenu = function(switchAlternate, hide)
     options:registerAfter(
         "mouseClick",
         function()
-            --disable right click button code by replacing it with a fake code. Taken from no combat menu
-            tes3.worldController.inputController.inputMaps[19].code = 5000
             tes3ui.findMenu("ATA_KNDI_TableMenu").disabled = true
             tes3ui.findMenu("ATA_KNDI_TableMenu").visible = false
 
@@ -1206,8 +1204,6 @@ core.optionMenu = function(static, hide)
             else
                 core.tableMenu()
             end
-            --restore original right click button
-            tes3.worldController.inputController.inputMaps[19].code = data.menuModeCode
             tes3ui.acquireTextInput(tes3ui.findMenu("ATA_KNDI_TableMenu"):findChild("ata_kindi_input"))
             tes3.playSound {sound = "menu click"}
             mwse.saveConfig("ancestral_tomb_amulets", config)
